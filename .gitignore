@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# DuckDB files (may contain real user data — never commit these)
+*.duckdb
+*.db
+
+# Data files users load in (never commit real data)
+*.csv
+*.xlsx
+*.xls
+/data/
+/uploads/
+
+# Environment/secrets
+.env
+
+# Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
