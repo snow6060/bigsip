@@ -50,3 +50,7 @@ def run_query(request: QueryRequest):
         return {"results": engine.run_query(request.sql)}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)
