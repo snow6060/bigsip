@@ -8,6 +8,7 @@ import os
 import re
 import duckdb
 import openpyxl
+import pandas
 
 # Keywords that indicate a write/destructive operation.
 # Phase 1 keeps this simple; Phase 3 will harden it properly.
@@ -92,9 +93,10 @@ class DataEngine:
             table_name = f"{base_name}_{_sanitize_name(sheet_name)}"
             self._register_table_name(table_name)
 
-            # DuckDB can query a Python list of dicts directly by
-            # registering it as a temporary virtual table.
-            self.con.register("temp_sheet_view", records)
+            # DuckDB can register a pandas DataFrame directly as a
+            # queryable virtual table — plain Python lists aren't supported.
+            df = pandas.DataFrame(records)
+            self.con.register("temp_sheet_view", df)
             self.con.execute(f"CREATE TABLE {table_name} AS SELECT * FROM temp_sheet_view")
             self.con.unregister("temp_sheet_view")
 
