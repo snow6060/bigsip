@@ -1,12 +1,14 @@
 """
 engine.py — owns all interaction with DuckDB.
 Knows nothing about HTTP, FastAPI, or the web. Its only job:
-load CSV file(s), describe their structure, and run read-only queries.
+load CSV/xlsx file(s), describe their structure, and run read-only queries.
 """
 
 import os
 import re
 import duckdb
+import openpyxl
+import pandas
 
 # Keywords that indicate a write/destructive operation.
 # Phase 1 keeps this simple; Phase 3 will harden it properly.
@@ -16,20 +18,23 @@ _FORBIDDEN_KEYWORDS = [
 ]
 
 
-def _sanitize_table_name(file_path: str) -> str:
+def _sanitize_name(raw: str) -> str:
     """
-    Turns a filename into a safe SQL table name.
-    e.g. 'My Sales (2024).csv' -> 'my_sales_2024'
+    Turns arbitrary text (filename or sheet name) into a safe
+    SQL identifier fragment. e.g. 'My Sales (2024)' -> 'my_sales_2024'
     """
-    base_name = os.path.splitext(os.path.basename(file_path))[0]
-    lowered = base_name.lower()
-    # Replace anything that isn't a letter, digit, or underscore with '_'
+    lowered = raw.lower()
     sanitized = re.sub(r"[^a-z0-9_]", "_", lowered)
-    # Collapse multiple underscores, strip leading/trailing ones
     sanitized = re.sub(r"_+", "_", sanitized).strip("_")
+    return sanitized
+
+
+def _sanitize_table_name(file_path: str) -> str:
+    """Derives a safe table name from a file path (no sheet involved)."""
+    base_name = os.path.splitext(os.path.basename(file_path))[0]
+    sanitized = _sanitize_name(base_name)
 
     if not sanitized or not sanitized[0].isalpha():
-        # SQL table names shouldn't start with a digit or be empty
         sanitized = f"table_{sanitized}" if sanitized else "table_unnamed"
 
     return sanitized
@@ -42,32 +47,65 @@ class DataEngine:
         self.con = duckdb.connect(database=":memory:")
         self.table_names: list[str] = []
 
-    def load_csv(self, file_path: str, table_name: str | None = None):
-        """
-        Loads a CSV file into DuckDB as a queryable table.
-        If table_name isn't given, it's derived from the filename.
-        Raises an error on name collision rather than silently overwriting.
-        """
-        if table_name is None:
-            table_name = _sanitize_table_name(file_path)
-
+    def _register_table_name(self, table_name: str):
+        """Shared collision check, used by both CSV and xlsx loaders."""
         if table_name in self.table_names:
             raise ValueError(
                 f"Table name '{table_name}' is already in use. "
-                f"Rename the file or choose a different table name."
+                f"Rename the file/sheet or choose a different table name."
             )
+        self.table_names.append(table_name)
+
+    def load_csv(self, file_path: str, table_name: str | None = None):
+        """Loads a CSV file into DuckDB as a queryable table."""
+        if table_name is None:
+            table_name = _sanitize_table_name(file_path)
+
+        self._register_table_name(table_name)
 
         self.con.execute(
             f"CREATE TABLE {table_name} AS SELECT * FROM read_csv_auto(?)",
             [file_path],
         )
-        self.table_names.append(table_name)
+
+    def load_xlsx(self, file_path: str):
+        """
+        Loads every sheet in an xlsx file as its own DuckDB table.
+        Table names follow the pattern '{filename}_{sheetname}', sanitized.
+
+        Assumes row 1 of each sheet is the header row — messier headers
+        (title rows, merged cells) are a known limitation, not handled here.
+        """
+        base_name = _sanitize_table_name(file_path)
+        workbook = openpyxl.load_workbook(file_path, data_only=True, read_only=True)
+
+        for sheet_name in workbook.sheetnames:
+            sheet = workbook[sheet_name]
+            rows = list(sheet.iter_rows(values_only=True))
+
+            if not rows:
+                continue  # skip genuinely empty sheets
+
+            headers = [str(h) if h is not None else f"col_{i}" for i, h in enumerate(rows[0])]
+            data_rows = rows[1:]
+            records = [dict(zip(headers, row)) for row in data_rows]
+
+            table_name = f"{base_name}_{_sanitize_name(sheet_name)}"
+            self._register_table_name(table_name)
+
+            # DuckDB can register a pandas DataFrame directly as a
+            # queryable virtual table — plain Python lists aren't supported.
+            df = pandas.DataFrame(records)
+            self.con.register("temp_sheet_view", df)
+            self.con.execute(f"CREATE TABLE {table_name} AS SELECT * FROM temp_sheet_view")
+            self.con.unregister("temp_sheet_view")
+
+        workbook.close()
 
     def get_schema(self) -> dict:
         """
         Returns column names/types + a small sample of rows,
-        for every loaded table — so an AI (or a human testing
-        manually) can see everything available to query.
+        for every loaded table.
         """
         if not self.table_names:
             raise RuntimeError("No tables loaded yet.")
@@ -96,7 +134,6 @@ class DataEngine:
         """
         Executes a read-only SQL query and returns rows as a list of dicts.
         Blocks obvious write/destructive statements by keyword check.
-        Works across any loaded tables, including JOINs between them.
         """
         lowered = sql.strip().lower()
 
