@@ -11,7 +11,8 @@ import openpyxl
 import pandas
 
 # Keywords that indicate a write/destructive operation.
-# Matched as whole words, not substrings, to reduce false positives/bypasses.
+# Matched as whole words, outside of string literals, to reduce
+# false positives/bypasses.
 _FORBIDDEN_KEYWORDS = [
     "insert", "update", "delete", "drop", "alter",
     "create", "attach", "copy", "pragma", "install", "load"
@@ -35,14 +36,30 @@ def _sanitize_table_name(file_path: str) -> str:
     return sanitized
 
 
+def _strip_string_literals(sql: str) -> str:
+    """
+    Replaces the contents of single-quoted string literals with a
+    neutral placeholder, so forbidden-keyword scanning doesn't false-
+    positive on legitimate search terms inside quotes (e.g. '%update%'
+    searching for the word "update" in data, not a SQL command).
+    Does not attempt to handle escaped quotes inside literals — SQL
+    string literals in DuckDB use '' (doubled single quote) to
+    represent a literal quote, which this simple approach doesn't
+    special-case, but that's a rare enough edge case to accept for now.
+    """
+    return re.sub(r"'[^']*'", "''", sql)
+
+
 def _contains_forbidden_keyword(sql: str) -> str | None:
     """
-    Checks for forbidden keywords as whole words (not substrings of other
-    words), using word boundaries. Returns the matched keyword, or None
-    if the query is clean.
+    Checks for forbidden keywords as whole words, OUTSIDE of string
+    literals (so a search term like '%update%' doesn't false-positive
+    on the word "update" appearing inside quotes). Returns the matched
+    keyword, or None if the query is clean.
     """
+    sql_without_literals = _strip_string_literals(sql)
     for keyword in _FORBIDDEN_KEYWORDS:
-        if re.search(rf"\b{keyword}\b", sql, re.IGNORECASE):
+        if re.search(rf"\b{keyword}\b", sql_without_literals, re.IGNORECASE):
             return keyword
     return None
 
@@ -131,7 +148,8 @@ class DataEngine:
         """
         Checks a query for safety issues WITHOUT executing it:
         - must start with SELECT
-        - must not contain forbidden keywords (as whole words)
+        - must not contain forbidden keywords (as whole words, outside
+          of string literals)
         - must be syntactically valid, checked via EXPLAIN (which plans
           the query without running it)
         Raises ValueError with a clear message if any check fails.
