@@ -55,6 +55,11 @@ def run_query(request: QueryRequest):
         return {"results": engine.run_query(request.sql)}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        # Catches DuckDB's own exceptions (syntax errors, etc.) that
+        # aren't ValueErrors, so the client always gets valid JSON back
+        # instead of a raw 500 error page.
+        raise HTTPException(status_code=400, detail=f"Query failed: {str(e)}")
 
 
 if __name__ == "__main__":
