@@ -82,3 +82,64 @@ a clean demo:
 - JSON's own escaping (`\\` for a literal `\`) can be mistaken for a data issue —
   worth clarifying upfront that this is just JSON's display convention, not the
   actual underlying data
+
+  ---
+
+## Test 2: Cross-AI, Cross-Format Validation (Gemini + xlsx)
+
+The first test (above) proved the Clipboard Bridge works with DeepSeek on CSV data,
+under genuinely messy real-world conditions. A second test was run to check two
+different things: **a different AI model** (Gemini) and **a different file format**
+(a two-sheet `.xlsx` file), using the finalized v2 system prompt.
+
+### The Setup
+
+- `test_employees.xlsx`, containing two sheets: `employees` (employee_id, full_name,
+  department, salary) and `departments` (department, manager)
+- Loaded via `bigsip`'s xlsx support (Phase 1.75), producing two tables:
+  `test_employees_employees` and `test_employees_departments`
+- A realistic, non-technical prompt was given first, without mentioning tables,
+  sheets, SQL, or JOINs:
+
+  > "I run a small company and use this spreadsheet to track my team. I want to
+  > understand my payroll better — specifically, I want to know each employee's
+  > salary alongside who manages their department, so I can see which managers are
+  > responsible for the largest total payroll."
+
+### The Result
+
+Gemini succeeded on the **first attempt**, with no errors and no back-and-forth
+correction needed:
+
+1. Correctly requested `BIGSIP_SCHEMA:` first, per the prompt's instructions
+2. Independently recognized, purely from the schema's column names, that
+   `department` was the shared key linking the two tables — this relationship was
+   never stated explicitly
+3. Wrote a correct, properly double-quoted SQL JOIN on the first try:
+```sql
+   SELECT e.full_name, e.salary, d.department, d.manager
+   FROM test_employees_employees e
+   JOIN test_employees_departments d ON e.department = d.department
+   ORDER BY d.manager, e.salary DESC
+```
+4. Correctly interpreted the business question ("which managers handle the largest
+   payroll") as requiring aggregation, and manually summed the results per manager
+   in its final answer — identifying Diana Lopez (Engineering, $200,000 total) as
+   responsible for the largest payroll footprint, ahead of Ethan Wu (Marketing,
+   $72,000)
+
+### Why This Test Matters
+
+Where the DeepSeek/CSV test demonstrated **resilience** — real bugs surfacing and
+being resolved collaboratively — this test demonstrates **reliability**: once the
+lessons from that first session were baked into the finalized system prompt, a
+second, different AI model handled a second, different file format cleanly, with
+zero errors, on the first try. Together, the two tests show the Clipboard Bridge
+works across both AI models and file formats, not just in one specific combination.
+
+One minor observation: Gemini answered the aggregation question by manually summing
+a small number of rows in its own reasoning, rather than writing a `GROUP BY`/`SUM`
+query to have the database do it. The answer was correct, but for larger datasets,
+a model that prefers database-side aggregation over manual summation would scale
+better — worth keeping in mind as an example prompt/technique for future system
+prompt refinements.
