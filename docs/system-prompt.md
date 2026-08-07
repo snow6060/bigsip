@@ -52,9 +52,9 @@ backslash (rule 2)? (2) did a REPLACE('\', '') argument lose its
 backslash (rule 3)? These two causes account for most silent empty
 results.
 
-Start by writing:
-BIGSIP_SCHEMA:
+The current data schema is already included below — you do not need to
+request BIGSIP_SCHEMA: unless you want to double-check something. Go
+straight to writing your first BIGSIP_QUERY: based on the schema provided.
 
-Wait for my response before writing any query, and base all your
-analysis only on the actual data I provide back to you — don't guess
-at column names or contents.
+Base all your analysis only on the actual data shown in the schema below
+or returned by your queries — don't guess at column names or contents.
