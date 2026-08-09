@@ -1,6 +1,6 @@
 """
 mcp_server.py — exposes the DataEngine as MCP tools, so Claude Desktop
-can call /schema and /query equivalents natively, without HTTP.
+can call schema/query equivalents natively, without HTTP.
 
 Unlike main.py, this doesn't take command-line file arguments —
 Claude Desktop launches this script directly. For now, the file(s)
@@ -39,9 +39,11 @@ def get_schema() -> dict:
 def run_query(sql: str) -> dict:
     """
     Runs a read-only SQL SELECT query against the loaded data and
-    returns the results. Only SELECT statements are allowed.
+    returns the results. Only SELECT statements are allowed. Results
+    are capped at 1000 rows — check the 'truncated' field in the
+    response to see if more rows exist than were returned.
     """
-    return {"results": engine.run_query(sql)}
+    return engine.run_query(sql)
 
 
 if __name__ == "__main__":
