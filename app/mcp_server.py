@@ -13,7 +13,7 @@ from app.engine import DataEngine
 
 # --- Configure which file(s) to load ---
 # TODO (Phase 4): replace this with a dynamic file-selection flow.
-FILES_TO_LOAD = ["c_storage_log.csv"]
+FILES_TO_LOAD = ["D:\\Projects\\LLM_Upload_Size_Limit_Killer_for_CSV\\bigsip\\c_storage_log.csv"]
 
 mcp = FastMCP("bigsip")
 engine = DataEngine()
