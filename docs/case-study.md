@@ -143,3 +143,76 @@ query to have the database do it. The answer was correct, but for larger dataset
 a model that prefers database-side aggregation over manual summation would scale
 better — worth keeping in mind as an example prompt/technique for future system
 prompt refinements.
+
+---
+
+## Test 3: Native MCP Integration (Claude Desktop, no manual relay)
+
+The first two tests validated the Clipboard Bridge — copy/paste relay between a
+browser-based AI and the local engine. This test validates the other front door:
+**native MCP integration**, where Claude Desktop calls `bigsip`'s tools directly,
+with zero manual copy/paste, using the same `DataEngine` under the hood.
+
+### The Setup
+
+- `mcp_server.py` exposes `get_schema()` and `run_query()` as MCP tools, calling
+  `DataEngine` directly (no HTTP hop, unlike the FastAPI gateway used by the other
+  front doors)
+- Configured in Claude Desktop via `claude_desktop_config.json`, launched as a
+  subprocess using the project's venv Python interpreter
+- Loaded the same `c_storage_log.csv` (560,198-row WinDirStat export) used in the
+  original DeepSeek case study
+
+### Real Bugs Found and Fixed Along the Way
+
+Getting a working MCP connection required diagnosing three separate, genuine
+issues — a good demonstration that "it works on paper" and "it works when a real
+client launches it" are different bars to clear:
+
+1. **Version mismatch**: the pinned `mcp==1.1.2` predated the `mcp.server.fastmcp`
+   module entirely, causing an immediate `ModuleNotFoundError`. Fixed by loosening
+   the pin to `mcp>=1.2.0,<2.0.0`.
+2. **Module resolution**: running the script directly (`python app\mcp_server.py`)
+   failed because Python couldn't resolve the `app` package from that location —
+   the same class of issue documented back in Phase 1 for `main.py`. Fixed with an
+   explicit `PYTHONPATH` environment variable in the MCP config, rather than
+   relying on `-m app.mcp_server` plus a `cwd` setting, which proved unreliable —
+   MCP's own debugging documentation confirms a launched server's working
+   directory should be treated as undefined.
+3. **Relative file path**: `mcp_server.py`'s hardcoded `FILES_TO_LOAD` used a
+   relative filename (`"c_storage_log.csv"`), which failed for the same
+   undefined-working-directory reason. Fixed by using an absolute path.
+
+Also discovered along the way: this installation of Claude Desktop uses a
+different config file location and format than older documentation describes —
+a packaged-app path (`AppData\Local\Packages\Claude_...\LocalCache\Roaming\Claude\
+claude_desktop_config.json`) containing general app settings, not a dedicated
+`mcpServers`-only file. The correct file was found via Claude Desktop's own
+Developer → Edit Config option, and the `mcpServers` key was merged into the
+existing settings rather than overwriting them.
+
+### The Result
+
+Once connected, a single natural-language question —
+*"What tables are available in bigsip, and what's in them?"* — triggered Claude
+Desktop to autonomously call `get_schema()` (after an explicit permission prompt,
+demonstrating MCP's built-in per-tool consent model), correctly interpret the
+schema, and even infer the data was a WinDirStat scan containing Xbox/PC game save
+directories.
+
+A follow-up request to see the largest folders triggered `run_query()`
+autonomously — Claude Desktop wrote its own SQL, correctly reasoned about
+overlapping parent/child folder sizes in the results, and surfaced a genuinely
+useful, specific finding: an 11.6 GB cache folder (`claudevm.bundle`) belonging to
+Claude Desktop's own app package — a small piece of irony, given the tool
+diagnosing the disk space problem turned out to be part of it.
+
+### Why This Test Matters
+
+Where the Clipboard Bridge tests proved the "any browser AI, manual relay" path
+works, this test proves the "native, zero-friction" path works too — completing
+validation of both front doors described in the original project roadmap. The
+permission-prompt flow is also a meaningful trust signal: unlike the Clipboard
+Bridge (where the user manually controls every copy/paste), native MCP required
+verifying that Claude Desktop's own consent model provides an equivalent safety
+guarantee before data is touched.
