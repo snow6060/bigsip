@@ -166,9 +166,18 @@ copyPromptBtn.addEventListener("click", async () => {
 });
 
 // ── Status dashboard ──
-async function refreshStatus() {
-    const response = await fetch(`${API_BASE}/status`);
+async function refreshSchema() {
+    const response = await fetch(`${API_BASE}/schema`);
     const data = await response.json();
 
-    statusDisplay.textContent = JSON.stringify(data, null, 2);
+    let html = "";
+    data.tables.forEach(table => {
+        html += `<h3>${table.table_name}</h3><ul>`;
+        table.columns.forEach(col => {
+            html += `<li>${col.name} <span style="color:#5a6b7d;">(${col.type})</span></li>`;
+        });
+        html += "</ul>";
+    });
+
+    schemaDisplay.innerHTML = html;
 }
