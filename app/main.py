@@ -163,18 +163,19 @@ def get_status():
     uptime_seconds = round(time.time() - _start_time, 1)
 
     try:
-        memory_info = engine.con.execute(
-            "SELECT * FROM pragma_database_size()"
-        ).fetchone()
+        result = engine.con.execute("SELECT * FROM pragma_database_size()")
+        column_names = [desc[0] for desc in result.description]
+        row = result.fetchone()
+        db_size_info = dict(zip(column_names, row)) if row else {}
+
         memory_usage = {
-            "database_size": memory_info[1] if memory_info else "unknown",
-            "memory_usage": memory_info[2] if memory_info else "unknown",
+            "memory_usage": db_size_info.get("memory_usage", "unknown"),
+            "memory_limit": db_size_info.get("memory_limit", "unknown"),
         }
     except Exception:
-        # PRAGMA database_size's exact output shape isn't something we've
-        # verified across DuckDB versions — fail gracefully rather than
-        # break /status entirely if the shape doesn't match what we expect.
-        memory_usage = {"database_size": "unavailable", "memory_usage": "unavailable"}
+        # Fail gracefully if the pragma's shape ever changes across
+        # DuckDB versions, rather than breaking /status entirely.
+        memory_usage = {"memory_usage": "unavailable", "memory_limit": "unavailable"}
 
     return {
         "tables_loaded": engine.table_names,
