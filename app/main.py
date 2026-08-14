@@ -10,6 +10,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.responses import PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 from app.engine import DataEngine
 import time
 
@@ -183,6 +184,8 @@ def get_status():
         **memory_usage,
     }
 
+
+app.mount("/ui", StaticFiles(directory="static", html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn

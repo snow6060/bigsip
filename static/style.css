@@ -1,0 +1,159 @@
+/* ── Reset & base ── */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    background: #0a0e14;
+    color: #e8edf2;
+    min-height: 100vh;
+    padding: 40px 20px;
+}
+
+/* ── Header ── */
+header {
+    max-width: 900px;
+    margin: 0 auto 40px auto;
+    text-align: center;
+}
+
+header h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: -0.02em;
+}
+
+header .tagline {
+    color: #8a97a8;
+    margin-top: 8px;
+    font-size: 1rem;
+}
+
+/* ── Main layout ── */
+main {
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* ── Section cards — steel/navy panel look ── */
+section {
+    background: #11161f;
+    border: 1px solid #2a3441;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transition: opacity 0.2s ease;
+}
+
+section h2 {
+    font-size: 1.2rem;
+    color: #ffffff;
+    margin-bottom: 16px;
+    border-left: 4px solid #2f6fed;
+    padding-left: 12px;
+}
+
+/* ── Progressive disclosure ── */
+.hidden {
+    display: none;
+}
+
+/* ── Buttons ── */
+button {
+    background: #2f6fed;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+button:hover {
+    background: #4a80f0;
+}
+
+button:active {
+    background: #1f56c9;
+}
+
+/* ── Text inputs / textareas ── */
+textarea, input[type="text"] {
+    width: 100%;
+    background: #0a0e14;
+    border: 1px solid #2a3441;
+    border-radius: 8px;
+    color: #e8edf2;
+    padding: 12px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 0.9rem;
+    resize: vertical;
+    min-height: 80px;
+}
+
+textarea:focus, input[type="text"]:focus {
+    outline: none;
+    border-color: #2f6fed;
+}
+
+/* ── Loaded files list ── */
+#loaded-files-list {
+    list-style: none;
+    margin-top: 16px;
+}
+
+#loaded-files-list li {
+    background: #0a0e14;
+    border: 1px solid #2a3441;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 0.85rem;
+    color: #a8b5c4;
+}
+
+/* ── Schema / status display blocks ── */
+#schema-display, #status-display {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 0.85rem;
+    color: #a8b5c4;
+    white-space: pre-wrap;
+}
+
+/* ── Query results ── */
+#query-results {
+    margin-top: 16px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+#query-results table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+#query-results th {
+    background: #1a2230;
+    color: #ffffff;
+    text-align: left;
+    padding: 8px 12px;
+    position: sticky;
+    top: 0;
+}
+
+#query-results td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #1a2230;
+    color: #c5cfda;
+}
