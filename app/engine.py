@@ -95,16 +95,32 @@ class DataEngine:
             [file_path],
         )
 
-    def load_xlsx(self, file_path: str):
+    def load_xlsx(self, file_path: str, sheets: list[str] | None = None):
+        """
+        Loads sheets from an xlsx file as separate DuckDB tables.
+        Table names follow the pattern '{filename}_{sheetname}', sanitized.
+
+        If 'sheets' is None (default), every sheet in the file is loaded —
+        this preserves the original behavior. Pass a list of sheet names
+        to load only specific sheets instead.
+
+        Assumes row 1 of each sheet is the header row — messier headers
+        (title rows, merged cells) are a known limitation, not handled here.
+        """
         base_name = _sanitize_table_name(file_path)
         workbook = openpyxl.load_workbook(file_path, data_only=True, read_only=True)
 
-        for sheet_name in workbook.sheetnames:
+        sheet_names_to_load = sheets if sheets is not None else workbook.sheetnames
+
+        for sheet_name in sheet_names_to_load:
+            if sheet_name not in workbook.sheetnames:
+                raise ValueError(f"Sheet '{sheet_name}' not found in '{file_path}'.")
+
             sheet = workbook[sheet_name]
             rows = list(sheet.iter_rows(values_only=True))
 
             if not rows:
-                continue
+                continue  # skip genuinely empty sheets
 
             headers = [str(h) if h is not None else f"col_{i}" for i, h in enumerate(rows[0])]
             data_rows = rows[1:]
@@ -113,6 +129,8 @@ class DataEngine:
             table_name = f"{base_name}_{_sanitize_name(sheet_name)}"
             self._register_table_name(table_name)
 
+            # DuckDB can register a pandas DataFrame directly as a
+            # queryable virtual table — plain Python lists aren't supported.
             df = pandas.DataFrame(records)
             self.con.register("temp_sheet_view", df)
             self.con.execute(f"CREATE TABLE {table_name} AS SELECT * FROM temp_sheet_view")

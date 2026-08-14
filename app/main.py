@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.responses import PlainTextResponse
 from app.engine import DataEngine
+import time
 
 app = FastAPI(title="bigsip gateway")
 engine = DataEngine()
@@ -21,10 +22,16 @@ engine = DataEngine()
 # itself stops running in the background.
 _query_executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 _QUERY_TIMEOUT_SECONDS = 15
-
+_start_time = time.time()
 
 class QueryRequest(BaseModel):
     sql: str
+
+class LoadFileRequest(BaseModel):
+    file_path: str
+    table_name: str | None = None
+    sheets: list[str] | None = None
+
 
 
 @app.on_event("startup")
@@ -114,6 +121,67 @@ def get_prompt(context: str | None = None):
     parts.append(f"\nCURRENT DATA SCHEMA (already loaded, no need to request BIGSIP_SCHEMA first):\n{schema_text}")
 
     return "\n\n".join(parts)
+
+
+@app.post("/load")
+def load_file(request: LoadFileRequest):
+    """
+    Loads a file into the already-running engine. Unlike startup-time
+    loading (via command-line args), this lets the UI load files after
+    the server is already running.
+    """
+    ext = Path(request.file_path).suffix.lower()
+
+    try:
+        if ext == ".csv":
+            engine.load_csv(request.file_path, table_name=request.table_name)
+            new_tables = [engine.table_names[-1]]
+        elif ext == ".xlsx":
+            before = set(engine.table_names)
+            engine.load_xlsx(request.file_path, sheets=request.sheets)
+            new_tables = [t for t in engine.table_names if t not in before]
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type: '{request.file_path}'"
+            )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to load file: {str(e)}")
+
+    return {"loaded_tables": new_tables}
+
+
+@app.get("/status")
+def get_status():
+    """
+    Returns basic runtime info for the UI's dashboard: which tables are
+    loaded, how long the server's been running, and DuckDB's reported
+    memory usage.
+    """
+    uptime_seconds = round(time.time() - _start_time, 1)
+
+    try:
+        result = engine.con.execute("SELECT * FROM pragma_database_size()")
+        column_names = [desc[0] for desc in result.description]
+        row = result.fetchone()
+        db_size_info = dict(zip(column_names, row)) if row else {}
+
+        memory_usage = {
+            "memory_usage": db_size_info.get("memory_usage", "unknown"),
+            "memory_limit": db_size_info.get("memory_limit", "unknown"),
+        }
+    except Exception:
+        # Fail gracefully if the pragma's shape ever changes across
+        # DuckDB versions, rather than breaking /status entirely.
+        memory_usage = {"memory_usage": "unavailable", "memory_limit": "unavailable"}
+
+    return {
+        "tables_loaded": engine.table_names,
+        "uptime_seconds": uptime_seconds,
+        **memory_usage,
+    }
 
 
 if __name__ == "__main__":
