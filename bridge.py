@@ -18,6 +18,13 @@ POLL_INTERVAL_SECONDS = 0.5
 SCHEMA_MARKER = "BIGSIP_SCHEMA:"
 QUERY_MARKER = "BIGSIP_QUERY:"
 
+HEARTBEAT_PATH = "bridge_heartbeat.txt"
+
+
+def write_heartbeat():
+    with open(HEARTBEAT_PATH, "w") as f:
+        f.write(str(time.time()))
+
 
 def handle_schema_request() -> str:
     response = requests.get(f"{GATEWAY_URL}/schema")
@@ -71,6 +78,7 @@ def main():
 
     while True:
         time.sleep(POLL_INTERVAL_SECONDS)
+        write_heartbeat()
         current = pyperclip.paste()
 
         if current == last_seen:

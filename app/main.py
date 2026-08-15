@@ -13,6 +13,7 @@ from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from app.engine import DataEngine
 import time
+import os
 
 app = FastAPI(title="bigsip gateway")
 engine = DataEngine()
@@ -183,6 +184,28 @@ def get_status():
         "uptime_seconds": uptime_seconds,
         **memory_usage,
     }
+
+
+HEARTBEAT_PATH = "bridge_heartbeat.txt"
+_BRIDGE_HEARTBEAT_TIMEOUT = 3  # seconds
+
+
+@app.get("/bridge-status")
+def get_bridge_status():
+    """
+    Checks if the clipboard bridge is running by looking at the heartbeat
+    file written by bridge.py. If the file exists and was modified within
+    the last _BRIDGE_HEARTBEAT_TIMEOUT seconds, the bridge is considered
+    active.
+    """
+    try:
+        mtime = os.path.getmtime(HEARTBEAT_PATH)
+        age = time.time() - mtime
+        bridge_running = age < _BRIDGE_HEARTBEAT_TIMEOUT
+    except OSError:
+        bridge_running = False
+
+    return {"bridge_running": bridge_running}
 
 
 app.mount("/ui", StaticFiles(directory="static", html=True), name="static")

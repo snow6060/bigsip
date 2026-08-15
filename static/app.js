@@ -20,6 +20,7 @@ const promptContext = document.getElementById("prompt-context");
 const copyPromptBtn = document.getElementById("copy-prompt-btn");
 
 const statusSection = document.getElementById("status-section");
+const bridgeStatusEl = document.getElementById("bridge-status");
 const statusDisplay = document.getElementById("status-display");
 
 // ── File selection ──
@@ -177,3 +178,20 @@ async function refreshStatus() {
 
     statusDisplay.textContent = JSON.stringify(data, null, 2);
 }
+
+// ── Bridge status ──
+async function checkBridgeStatus() {
+    try {
+        const response = await fetch(`${API_BASE}/bridge-status`);
+        const data = await response.json();
+
+        bridgeStatusEl.textContent = data.bridge_running
+            ? "🟢 Clipboard Bridge: Active"
+            : "⚪ Clipboard Bridge: Not running";
+    } catch {
+        bridgeStatusEl.textContent = "⚪ Clipboard Bridge: Not running";
+    }
+}
+
+checkBridgeStatus();
+setInterval(checkBridgeStatus, 2000);
