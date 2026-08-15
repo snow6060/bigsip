@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>bigsip</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <header>
+        <h1>bigsip</h1>
+        <p class="tagline">Query massive local files with AI — without uploading them.</p>
+    </header>
+
+    <main>
+
+        <!-- Section 1: File loading — always visible -->
+        <section id="load-section">
+            <h2>Load Data</h2>
+            <button id="select-files-btn">Select File(s)</button>
+            <input type="file" id="file-input" multiple accept=".csv,.xlsx" style="display: none;">
+            <ul id="loaded-files-list"></ul>
+        </section>
+
+        <!-- Section 2: Schema view — hidden until a file is loaded -->
+        <section id="schema-section" class="hidden">
+            <h2>Loaded Tables</h2>
+            <div id="schema-display"></div>
+        </section>
+
+        <!-- Section 3: Query tester — hidden until a file is loaded -->
+        <section id="query-section" class="hidden">
+            <h2>Run a Query</h2>
+            <textarea id="query-input" placeholder="SELECT * FROM your_table LIMIT 10"></textarea>
+            <button id="run-query-btn">Run Query</button>
+            <div id="query-results"></div>
+        </section>
+
+        <!-- Section 4: Prompt generator — hidden until a file is loaded -->
+        <section id="prompt-section" class="hidden">
+            <h2>AI System Prompt</h2>
+            <textarea id="prompt-context" placeholder="Optional: add context about what you're trying to do"></textarea>
+            <button id="copy-prompt-btn">Copy Prompt</button>
+        </section>
+
+        <!-- Section 5: Status dashboard — hidden until a file is loaded -->
+        <section id="status-section" class="hidden">
+            <h2>Status</h2>
+            <div id="status-display"></div>
+        </section>
+
+    </main>
+
+    <script src="app.js"></script>
+
+</body>
+</html>

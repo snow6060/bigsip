@@ -79,8 +79,10 @@ class DataEngine:
     def _register_table_name(self, table_name: str):
         if table_name in self.table_names:
             raise ValueError(
-                f"Table name '{table_name}' is already in use. "
-                f"Rename the file/sheet or choose a different table name."
+                f"A table named '{table_name}' is already loaded — this usually means "
+                f"you're trying to load the same file twice, or two different files "
+                f"produced the same table name. Rename the file, or choose a custom "
+                f"table name, to load it as a separate table."
             )
         self.table_names.append(table_name)
 
