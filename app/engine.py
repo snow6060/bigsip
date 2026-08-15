@@ -77,14 +77,14 @@ class DataEngine:
         self.con.execute("SET memory_limit = '2GB'")
 
     def _register_table_name(self, table_name: str):
-    if table_name in self.table_names:
-        raise ValueError(
-            f"A table named '{table_name}' is already loaded — this usually means "
-            f"you're trying to load the same file twice, or two different files "
-            f"produced the same table name. Rename the file, or choose a custom "
-            f"table name, to load it as a separate table."
-        )
-    self.table_names.append(table_name)
+        if table_name in self.table_names:
+            raise ValueError(
+                f"A table named '{table_name}' is already loaded — this usually means "
+                f"you're trying to load the same file twice, or two different files "
+                f"produced the same table name. Rename the file, or choose a custom "
+                f"table name, to load it as a separate table."
+            )
+        self.table_names.append(table_name)
 
     def load_csv(self, file_path: str, table_name: str | None = None):
         if table_name is None:

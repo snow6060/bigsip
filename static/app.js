@@ -35,10 +35,11 @@ fileInput.addEventListener("change", async (event) => {
         // security reasons — file.name is usually all we get. We ask
         // the user to confirm/complete the full path, since our backend
         // needs a real filesystem path (not the file's bytes) to load it.
-        const suggestedPath = file.name;
+        const exampleSuggestion = `D:\\path\\to\\${file.name}`;
         const fullPath = prompt(
-            `Confirm the full path to "${file.name}":`,
-            suggestedPath
+            `Browsers don't share the full file path for security reasons.\n` +
+            `Please type or paste the FULL path to "${file.name}":`,
+            exampleSuggestion
         );
 
         if (!fullPath) continue; // user cancelled
@@ -91,7 +92,16 @@ async function refreshSchema() {
     const response = await fetch(`${API_BASE}/schema`);
     const data = await response.json();
 
-    schemaDisplay.textContent = JSON.stringify(data, null, 2);
+    let html = "";
+    data.tables.forEach(table => {
+        html += `<h3>${table.table_name}</h3><ul>`;
+        table.columns.forEach(col => {
+            html += `<li>${col.name} <span style="color:#5a6b7d;">(${col.type})</span></li>`;
+        });
+        html += "</ul>";
+    });
+
+    schemaDisplay.innerHTML = html;
 }
 
 // ── Query runner ──
@@ -166,18 +176,9 @@ copyPromptBtn.addEventListener("click", async () => {
 });
 
 // ── Status dashboard ──
-async function refreshSchema() {
-    const response = await fetch(`${API_BASE}/schema`);
+async function refreshStatus() {
+    const response = await fetch(`${API_BASE}/status`);
     const data = await response.json();
 
-    let html = "";
-    data.tables.forEach(table => {
-        html += `<h3>${table.table_name}</h3><ul>`;
-        table.columns.forEach(col => {
-            html += `<li>${col.name} <span style="color:#5a6b7d;">(${col.type})</span></li>`;
-        });
-        html += "</ul>";
-    });
-
-    schemaDisplay.innerHTML = html;
+    statusDisplay.textContent = JSON.stringify(data, null, 2);
 }
