@@ -35,12 +35,7 @@ fileInput.addEventListener("change", async (event) => {
         // security reasons — file.name is usually all we get. We ask
         // the user to confirm/complete the full path, since our backend
         // needs a real filesystem path (not the file's bytes) to load it.
-        const exampleSuggestion = `D:\\path\\to\\${file.name}`;
-        const fullPath = prompt(
-            `Browsers don't share the full file path for security reasons.\n` +
-            `Please type or paste the FULL path to "${file.name}":`,
-            exampleSuggestion
-        );
+        const fullPath = prompt(`Paste the full path to "${file.name}":`, "Paste path here");
 
         if (!fullPath) continue; // user cancelled
 
