@@ -195,3 +195,9 @@ async function checkBridgeStatus() {
 
 checkBridgeStatus();
 setInterval(checkBridgeStatus, 2000);
+
+setInterval(() => {
+    if (!statusSection.classList.contains("hidden")) {
+        refreshStatus();
+    }
+}, 3000);
