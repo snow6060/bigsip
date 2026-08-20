@@ -223,8 +223,14 @@ def find_free_port() -> int:
         return s.getsockname()[1]
 
 
+PORT_FILE_PATH = "bigsip_port.txt"
+
 if __name__ == "__main__":
     import uvicorn
     port = find_free_port()
+
+    with open(PORT_FILE_PATH, "w") as f:
+        f.write(str(port))
+
     print(f"Starting bigsip gateway on http://127.0.0.1:{port}")
     uvicorn.run(app, host="127.0.0.1", port=port)

@@ -12,7 +12,25 @@ import json
 import requests
 import pyperclip
 
-GATEWAY_URL = "http://127.0.0.1:8000"
+PORT_FILE_PATH = "bigsip_port.txt"
+
+
+def get_gateway_url() -> str:
+    """
+    Reads the gateway's actual port from the file main.py writes on
+    startup, since the port is now allocated dynamically rather than
+    fixed at 8000. Falls back to 8000 if the file isn't found, for
+    backward compatibility with any manual/older setup.
+    """
+    try:
+        with open(PORT_FILE_PATH, "r") as f:
+            port = f.read().strip()
+        return f"http://127.0.0.1:{port}"
+    except (FileNotFoundError, ValueError):
+        return "http://127.0.0.1:8000"
+
+
+GATEWAY_URL = get_gateway_url()
 POLL_INTERVAL_SECONDS = 0.5
 
 SCHEMA_MARKER = "BIGSIP_SCHEMA:"
