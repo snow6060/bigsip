@@ -11,8 +11,7 @@ import time
 import json
 import requests
 import pyperclip
-
-PORT_FILE_PATH = "bigsip_port.txt"
+from app.paths import PORT_FILE_PATH, HEARTBEAT_FILE_PATH
 
 
 def get_gateway_url() -> str:
@@ -36,11 +35,8 @@ POLL_INTERVAL_SECONDS = 0.5
 SCHEMA_MARKER = "BIGSIP_SCHEMA:"
 QUERY_MARKER = "BIGSIP_QUERY:"
 
-HEARTBEAT_PATH = "bridge_heartbeat.txt"
-
-
 def write_heartbeat():
-    with open(HEARTBEAT_PATH, "w") as f:
+    with open(HEARTBEAT_FILE_PATH, "w") as f:
         f.write(str(time.time()))
 
 

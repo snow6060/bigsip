@@ -36,6 +36,3 @@ Thumbs.db
 
 # Logs
 *.log
-
-bridge_heartbeat.txt
-bigsip_port.txt
