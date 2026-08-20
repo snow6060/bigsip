@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from app.engine import DataEngine
 import time
 import os
+from app.paths import PORT_FILE_PATH, HEARTBEAT_FILE_PATH
 
 app = FastAPI(title="bigsip gateway")
 engine = DataEngine()
@@ -186,7 +187,6 @@ def get_status():
     }
 
 
-HEARTBEAT_PATH = "bridge_heartbeat.txt"
 _BRIDGE_HEARTBEAT_TIMEOUT = 3  # seconds
 
 
@@ -199,7 +199,7 @@ def get_bridge_status():
     active.
     """
     try:
-        mtime = os.path.getmtime(HEARTBEAT_PATH)
+        mtime = os.path.getmtime(HEARTBEAT_FILE_PATH)
         age = time.time() - mtime
         bridge_running = age < _BRIDGE_HEARTBEAT_TIMEOUT
     except OSError:
@@ -222,8 +222,6 @@ def find_free_port() -> int:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]
 
-
-PORT_FILE_PATH = "bigsip_port.txt"
 
 if __name__ == "__main__":
     import uvicorn
