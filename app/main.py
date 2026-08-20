@@ -210,6 +210,27 @@ def get_bridge_status():
 
 app.mount("/ui", StaticFiles(directory="static", html=True), name="static")
 
+def find_free_port() -> int:
+    """
+    Asks the OS for any currently-available port, rather than assuming
+    a hardcoded port (like 8000) is free. Binding to port 0 tells the
+    OS "pick one for me" — this avoids crashing if something else on
+    the user's machine already occupies our usual port.
+    """
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+PORT_FILE_PATH = "bigsip_port.txt"
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    port = find_free_port()
+
+    with open(PORT_FILE_PATH, "w") as f:
+        f.write(str(port))
+
+    print(f"Starting bigsip gateway on http://127.0.0.1:{port}")
+    uvicorn.run(app, host="127.0.0.1", port=port)
