@@ -16,14 +16,22 @@ prompt()-based picker in a later step of this same phase).
 
 import threading
 import time
-
 import requests
 import uvicorn
 import webview
+from pathlib import Path
 
 from app.main import app, find_free_port
 
-LOADING_PAGE = "static/loading.html"
+LOADING_PAGE = str(Path(__file__).resolve().parent.parent / "static" / "loading.html")
+
+# The splash is a deliberate, polished beat — not just a stopgap for
+# server startup. It's shown for at least this long regardless of how
+# fast uvicorn actually comes up, so a fast local start doesn't produce
+# a flash the user barely registers. If the server takes LONGER than
+# this, the swap simply waits for it — loading.html's "Starting up..."
+# animation is indefinite by design, so it holds up fine either way.
+MIN_SPLASH_SECONDS = 10.5
 
 
 def run_server(port: int):
@@ -43,10 +51,14 @@ def wait_for_server_and_swap(window, port: int):
     Passed to webview.start() as the function to run once the window
     exists. Polls /status (not /schema — /status is always a valid 200
     even with zero tables loaded, which is exactly our startup state)
-    until the gateway answers, then swaps the window's content from the
-    static loading page over to the live dashboard.
+    until the gateway answers, then tops off the remaining time to hit
+    MIN_SPLASH_SECONDS before swapping the window's content over from
+    the static loading page to the live dashboard. These are two
+    independent conditions — "server ready" and "minimum time elapsed"
+    — and both must be true before the swap happens.
     """
     gateway_url = f"http://127.0.0.1:{port}"
+    start_time = time.monotonic()
 
     while True:
         try:
@@ -56,6 +68,11 @@ def wait_for_server_and_swap(window, port: int):
         except requests.exceptions.RequestException:
             pass  # server not up yet — keep polling
         time.sleep(0.2)
+
+    elapsed = time.monotonic() - start_time
+    remaining = MIN_SPLASH_SECONDS - elapsed
+    if remaining > 0:
+        time.sleep(remaining)
 
     window.load_url(f"{gateway_url}/ui")
 
