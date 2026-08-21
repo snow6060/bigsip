@@ -1,3 +1,14 @@
+/* ── Brand palette (sampled directly from Logo_final_no_background.png) ── */
+:root {
+    --bigsip-navy-deep: #0a193f;   /* core of the glass panel — base background */
+    --bigsip-navy-mid:  #3a4d78;   /* panel's lighter gradient — accents, buttons */
+    --bigsip-slate:     #171f33;   /* derived: lighter than navy-deep, for card separation */
+    --bigsip-steel:     #474f5b;   /* brushed-frame gray — borders */
+    --bigsip-chrome:    #d2d2d2;   /* brushed-frame highlight — hover/active states */
+    --bigsip-white:     #ffffff;   /* wordmark white — headings, primary text */
+    --bigsip-text-muted: #9aa5b8;  /* softened chrome — body copy, secondary text */
+}
+
 /* ── Reset & base ── */
 * {
     margin: 0;
@@ -7,8 +18,8 @@
 
 body {
     font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-    background: #0a0e14;
-    color: #e8edf2;
+    background: var(--bigsip-navy-deep);
+    color: var(--bigsip-text-muted);
     min-height: 100vh;
     padding: 40px 20px;
 }
@@ -23,12 +34,12 @@ header {
 header h1 {
     font-size: 2.5rem;
     font-weight: 700;
-    color: #ffffff;
+    color: var(--bigsip-white);
     letter-spacing: -0.02em;
 }
 
 header .tagline {
-    color: #8a97a8;
+    color: var(--bigsip-text-muted);
     margin-top: 8px;
     font-size: 1rem;
 }
@@ -44,8 +55,8 @@ main {
 
 /* ── Section cards — steel/navy panel look ── */
 section {
-    background: #11161f;
-    border: 1px solid #2a3441;
+    background: var(--bigsip-slate);
+    border: 1px solid rgba(71, 79, 91, 0.4); /* steel, low opacity */
     border-radius: 12px;
     padding: 24px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -54,9 +65,9 @@ section {
 
 section h2 {
     font-size: 1.2rem;
-    color: #ffffff;
+    color: var(--bigsip-white);
     margin-bottom: 16px;
-    border-left: 4px solid #2f6fed;
+    border-left: 4px solid var(--bigsip-navy-mid);
     padding-left: 12px;
 }
 
@@ -67,8 +78,8 @@ section h2 {
 
 /* ── Buttons ── */
 button {
-    background: #2f6fed;
-    color: #ffffff;
+    background: var(--bigsip-navy-mid);
+    color: var(--bigsip-white);
     border: none;
     border-radius: 8px;
     padding: 10px 20px;
@@ -79,20 +90,20 @@ button {
 }
 
 button:hover {
-    background: #4a80f0;
+    background: #4a5f92; /* navy-mid lightened toward chrome */
 }
 
 button:active {
-    background: #1f56c9;
+    background: var(--bigsip-navy-deep);
 }
 
 /* ── Text inputs / textareas ── */
 textarea, input[type="text"] {
     width: 100%;
-    background: #0a0e14;
-    border: 1px solid #2a3441;
+    background: var(--bigsip-navy-deep);
+    border: 1px solid rgba(71, 79, 91, 0.4);
     border-radius: 8px;
-    color: #e8edf2;
+    color: var(--bigsip-text-muted);
     padding: 12px;
     font-family: 'Consolas', 'Courier New', monospace;
     font-size: 0.9rem;
@@ -102,7 +113,7 @@ textarea, input[type="text"] {
 
 textarea:focus, input[type="text"]:focus {
     outline: none;
-    border-color: #2f6fed;
+    border-color: var(--bigsip-navy-mid);
 }
 
 /* ── Loaded files list ── */
@@ -112,21 +123,21 @@ textarea:focus, input[type="text"]:focus {
 }
 
 #loaded-files-list li {
-    background: #0a0e14;
-    border: 1px solid #2a3441;
+    background: var(--bigsip-navy-deep);
+    border: 1px solid rgba(71, 79, 91, 0.4);
     border-radius: 6px;
     padding: 8px 12px;
     margin-bottom: 8px;
     font-family: 'Consolas', 'Courier New', monospace;
     font-size: 0.85rem;
-    color: #a8b5c4;
+    color: var(--bigsip-text-muted);
 }
 
 /* ── Schema / status display blocks ── */
 #schema-display, #status-display {
     font-family: 'Consolas', 'Courier New', monospace;
     font-size: 0.85rem;
-    color: #a8b5c4;
+    color: var(--bigsip-text-muted);
     white-space: pre-wrap;
 }
 
@@ -144,8 +155,8 @@ textarea:focus, input[type="text"]:focus {
 }
 
 #query-results th {
-    background: #1a2230;
-    color: #ffffff;
+    background: var(--bigsip-navy-deep);
+    color: var(--bigsip-white);
     text-align: left;
     padding: 8px 12px;
     position: sticky;
@@ -154,6 +165,6 @@ textarea:focus, input[type="text"]:focus {
 
 #query-results td {
     padding: 8px 12px;
-    border-bottom: 1px solid #1a2230;
-    color: #c5cfda;
+    border-bottom: 1px solid rgba(71, 79, 91, 0.3);
+    color: var(--bigsip-text-muted);
 }
