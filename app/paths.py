@@ -27,3 +27,4 @@ def get_app_data_dir() -> Path:
 
 PORT_FILE_PATH = get_app_data_dir() / "bigsip_port.txt"
 HEARTBEAT_FILE_PATH = get_app_data_dir() / "bridge_heartbeat.txt"
+MCP_HEARTBEAT_FILE_PATH = get_app_data_dir() / "mcp_heartbeat.txt"

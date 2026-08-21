@@ -8,8 +8,12 @@ to load are set below. A proper "ask the user what to load" flow
 is a Phase 4 UI concern.
 """
 
+import threading
+import time
+
 from mcp.server.fastmcp import FastMCP
 from app.engine import DataEngine
+from app.paths import MCP_HEARTBEAT_FILE_PATH
 
 # --- Configure which file(s) to load ---
 # TODO (Phase 4): replace this with a dynamic file-selection flow.
@@ -23,6 +27,34 @@ for path in FILES_TO_LOAD:
         engine.load_csv(path)
     elif path.lower().endswith(".xlsx"):
         engine.load_xlsx(path)
+
+
+_HEARTBEAT_INTERVAL_SECONDS = 1.0
+
+
+def _write_heartbeat_loop():
+    """
+    Writes a timestamp to MCP_HEARTBEAT_FILE_PATH every
+    _HEARTBEAT_INTERVAL_SECONDS, for as long as this process is alive.
+    This is what lets bigsip's own dashboard distinguish "MCP is
+    configured in Claude Desktop's config" from "MCP is actually
+    running right now" — a stale/missing heartbeat means Claude
+    Desktop doesn't currently have this script running as a
+    subprocess, even if the config entry pointing at it is correct.
+
+    Runs as a daemon thread so it never blocks mcp.run() (which owns
+    the actual stdio communication with Claude Desktop) and dies
+    automatically when the process exits — no explicit shutdown needed.
+    """
+    while True:
+        try:
+            MCP_HEARTBEAT_FILE_PATH.write_text(str(time.time()), encoding="utf-8")
+        except OSError:
+            # If the app-data directory becomes briefly unwritable
+            # (e.g. antivirus lock), skip this beat rather than crash
+            # the whole MCP server over a non-critical side task.
+            pass
+        time.sleep(_HEARTBEAT_INTERVAL_SECONDS)
 
 
 @mcp.tool()
@@ -47,4 +79,7 @@ def run_query(sql: str) -> dict:
 
 
 if __name__ == "__main__":
+    heartbeat_thread = threading.Thread(target=_write_heartbeat_loop, daemon=True)
+    heartbeat_thread.start()
+
     mcp.run()
