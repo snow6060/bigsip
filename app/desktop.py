@@ -24,6 +24,7 @@ from pathlib import Path
 from app.main import app, find_free_port
 
 LOADING_PAGE = str(Path(__file__).resolve().parent.parent / "static" / "loading.html")
+ICON_PATH = str(Path(__file__).resolve().parent.parent / "static" / "logo.ico")
 
 # The splash is a deliberate, polished beat — not just a stopgap for
 # server startup. It's shown for at least this long regardless of how
@@ -93,7 +94,7 @@ def main():
     # webview.start()'s func/args run in a thread pywebview manages
     # internally, once the window exists — this call itself is what
     # blocks the main thread with the native window loop.
-    webview.start(wait_for_server_and_swap, (window, port))
+    webview.start(wait_for_server_and_swap, (window, port), icon=ICON_PATH)
 
 
 if __name__ == "__main__":
