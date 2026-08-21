@@ -40,9 +40,8 @@ class LoadFileRequest(BaseModel):
 @app.on_event("startup")
 def load_data_on_startup():
     if len(sys.argv) < 2:
-        raise RuntimeError(
-            "Usage: python -m app.main <file1.csv|xlsx> [more files...]"
-        )
+        print("No files provided at startup — waiting for files to be loaded via /load.")
+        return
 
     file_paths = sys.argv[1:]
     for file_path in file_paths:
