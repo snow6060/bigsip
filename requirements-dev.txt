@@ -1,0 +1,4 @@
+# Build-only tooling — not needed to run bigsip, only to package it
+# into a standalone .exe (Phase 5.4). Install with:
+#   pip install -r requirements-dev.txt
+pyinstaller==6.22.2
