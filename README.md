@@ -36,8 +36,8 @@ User ↔ AI (chat) ↔ Local Gateway (FastAPI) ↔ DuckDB ↔ Your file(s)
 - [ ] Phase 2 — native MCP integration (Claude Desktop, no manual copy-pasting)
 - [ ] Phase 2.5 — auto-generated system prompt (schema + relationships + custom instructions)
 - [ ] Phase 3 — safety: read-only enforcement, query timeouts, row limits
-- [ ] Phase 4 — simple local UI (drag files in, pick sheets/tables)
-- [ ] Phase 5 — packaged as a standalone `.exe`
+- [x] Phase 4 — simple local UI (drag files in, pick sheets/tables)
+- [ ] Phase 5 — packaged as a standalone `.exe` (5.1–5.3 done: dynamic ports, native desktop shell, MCP integration, unified UI — packaging itself in progress)
 - [ ] Phase 6 — Docker support
 - [ ] Phase 7 — CI/CD via GitHub Actions
 

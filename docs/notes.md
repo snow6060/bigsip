@@ -68,3 +68,28 @@ exceptions (e.g. SQL syntax errors) went uncaught and returned a raw, non-JSON
 from every request, this broke the whole loop with a cryptic error. Fixed by
 adding a broader `except Exception` at the API boundary — acceptable specifically
 because it's the outermost layer of an HTTP endpoint, not general-purpose code.
+## Phase 5.3 gotchas (pywebview desktop app)
+
+- `desktop.py` and `main.py` are two separate entrypoints that both need to
+  write `PORT_FILE_PATH` if anything (like `bridge.py`) is going to read it
+  reliably. `desktop.py` missed this originally — the port file went stale
+  on every desktop-app run until this was caught during testing. If you add
+  a third entrypoint later, don't forget this line.
+
+- `bridge.py` lives at the **repo root**, not inside `app/`. When importing
+  its functions from `desktop.py` (also inside `app/`), the correct import
+  is `from bridge import ...`, not `from app.bridge import ...` — easy
+  mistake, `ModuleNotFoundError` is the symptom.
+
+- `stop_bridge()` (in `desktop.py`) doesn't stop the clipboard-watching
+  thread instantly — it's checked once per `POLL_INTERVAL_SECONDS` (0.5s),
+  so there's a brief window where it's technically still watching after a
+  mode switch. Not dangerous, just not instant — don't mistake this for a
+  bug if the status badge takes half a second to update.
+
+- When multiple files/functions were being edited across sessions in small
+  snippets, actual on-disk state drifted from what was assumed more than
+  once (e.g. an entire uncommitted feature sitting unnoticed for several
+  turns). Running `git status` before every commit — not just trusting
+  memory of what "should" be there — caught this every time it happened.
+  Worth treating as a hard habit, not optional.
