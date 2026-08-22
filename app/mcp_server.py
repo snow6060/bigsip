@@ -3,30 +3,79 @@ mcp_server.py — exposes the DataEngine as MCP tools, so Claude Desktop
 can call schema/query equivalents natively, without HTTP.
 
 Unlike main.py, this doesn't take command-line file arguments —
-Claude Desktop launches this script directly. For now, the file(s)
-to load are set below. A proper "ask the user what to load" flow
-is a Phase 4 UI concern.
+Claude Desktop launches this script directly. Which files are loaded
+is controlled by mcp_files.json (see app/mcp_files.py), written by
+desktop.py's UI whenever the user picks files in MCP mode. This
+script checks that file for changes before every tool call, so a
+file picked in the UI becomes available to Claude Desktop on the very
+next question asked — no restart needed for that part (restarting
+Claude Desktop is only required for the one-time config/connection
+setup itself, handled separately by app/mcp_config.py).
 """
 
+import os
 import threading
 import time
+from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 from app.engine import DataEngine
-from app.paths import MCP_HEARTBEAT_FILE_PATH
-
-# --- Configure which file(s) to load ---
-# TODO (Phase 4): replace this with a dynamic file-selection flow.
-FILES_TO_LOAD = ["D:\\Projects\\LLM_Upload_Size_Limit_Killer_for_CSV\\bigsip\\c_storage_log.csv"]
+from app.paths import MCP_HEARTBEAT_FILE_PATH, MCP_FILES_PATH
+from app.mcp_files import read_mcp_files
 
 mcp = FastMCP("bigsip")
 engine = DataEngine()
 
-for path in FILES_TO_LOAD:
-    if path.lower().endswith(".csv"):
-        engine.load_csv(path)
-    elif path.lower().endswith(".xlsx"):
-        engine.load_xlsx(path)
+_loaded_paths: set[str] = set()
+_last_seen_mtime: float | None = None
+
+
+def _sync_files_if_changed():
+    """
+    Checks mcp_files.json's modification time; if it's changed since
+    the last check, loads any newly-listed files that aren't already
+    loaded. Cheap no-op (a single stat() call) when nothing's changed,
+    so calling this before every tool call has negligible overhead.
+
+    Deliberately never REMOVES already-loaded tables if a file drops
+    off the list — DuckDB's :memory: engine has no clean "unload one
+    table" operation here, and silently dropping data mid-session
+    could break a query the user's already relying on. Removal would
+    need its own deliberate design, not a side effect of this sync.
+    """
+    global _last_seen_mtime
+
+    try:
+        mtime = MCP_FILES_PATH.stat().st_mtime
+    except OSError:
+        return  # no file yet — nothing chosen in the UI so far
+
+    if mtime == _last_seen_mtime:
+        return
+    _last_seen_mtime = mtime
+
+    for file_path in read_mcp_files():
+        if file_path in _loaded_paths:
+            continue
+
+        ext = Path(file_path).suffix.lower()
+        try:
+            if ext == ".csv":
+                engine.load_csv(file_path)
+            elif ext == ".xlsx":
+                engine.load_xlsx(file_path)
+            else:
+                print(f"mcp_server: skipping unsupported file type: {file_path}")
+                continue
+        except ValueError as e:
+            # Table name collision (e.g. file already loaded under a
+            # different path, or two files sharing a sanitized name) —
+            # log and skip rather than crash tool calls over one bad
+            # file in the list.
+            print(f"mcp_server: could not load '{file_path}': {e}")
+            continue
+
+        _loaded_paths.add(file_path)
 
 
 _HEARTBEAT_INTERVAL_SECONDS = 1.0
@@ -36,23 +85,15 @@ def _write_heartbeat_loop():
     """
     Writes a timestamp to MCP_HEARTBEAT_FILE_PATH every
     _HEARTBEAT_INTERVAL_SECONDS, for as long as this process is alive.
-    This is what lets bigsip's own dashboard distinguish "MCP is
-    configured in Claude Desktop's config" from "MCP is actually
-    running right now" — a stale/missing heartbeat means Claude
-    Desktop doesn't currently have this script running as a
-    subprocess, even if the config entry pointing at it is correct.
-
-    Runs as a daemon thread so it never blocks mcp.run() (which owns
-    the actual stdio communication with Claude Desktop) and dies
-    automatically when the process exits — no explicit shutdown needed.
+    Lets bigsip's own dashboard distinguish "MCP is configured in
+    Claude Desktop's config" from "MCP is actually running right now."
+    Runs as a daemon thread so it never blocks mcp.run() and dies
+    automatically when the process exits.
     """
     while True:
         try:
             MCP_HEARTBEAT_FILE_PATH.write_text(str(time.time()), encoding="utf-8")
         except OSError:
-            # If the app-data directory becomes briefly unwritable
-            # (e.g. antivirus lock), skip this beat rather than crash
-            # the whole MCP server over a non-critical side task.
             pass
         time.sleep(_HEARTBEAT_INTERVAL_SECONDS)
 
@@ -64,6 +105,7 @@ def get_schema() -> dict:
     and a few sample rows. Call this first to understand what data
     is available before writing a query.
     """
+    _sync_files_if_changed()
     return engine.get_schema()
 
 
@@ -75,6 +117,7 @@ def run_query(sql: str) -> dict:
     are capped at 1000 rows — check the 'truncated' field in the
     response to see if more rows exist than were returned.
     """
+    _sync_files_if_changed()
     return engine.run_query(sql)
 
 
@@ -82,4 +125,5 @@ if __name__ == "__main__":
     heartbeat_thread = threading.Thread(target=_write_heartbeat_loop, daemon=True)
     heartbeat_thread.start()
 
+    _sync_files_if_changed()  # pick up any files already chosen before this launch
     mcp.run()

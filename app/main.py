@@ -155,6 +155,16 @@ def load_file(request: LoadFileRequest):
     return {"loaded_tables": new_tables}
 
 
+@app.delete("/table/{table_name}")
+def drop_table(table_name: str):
+    try:
+        engine.drop_table(table_name)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    return {"dropped": table_name, "remaining_tables": engine.table_names}
+
+
 @app.get("/status")
 def get_status():
     """
