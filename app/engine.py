@@ -164,6 +164,21 @@ class DataEngine:
 
         return {"tables": tables}
 
+    def drop_table(self, table_name: str):
+        """
+        Removes a single table from the engine — used for per-file
+        removal in the UI. Only allows dropping a table that's actually
+        in self.table_names (never an arbitrary string), which is what
+        makes the raw f-string below safe: table_name is checked against
+        a known, already-sanitized list before ever touching SQL, not
+        taken directly from user input.
+        """
+        if table_name not in self.table_names:
+            raise ValueError(f"No table named '{table_name}' is currently loaded.")
+
+        self.con.execute(f"DROP TABLE {table_name}")
+        self.table_names.remove(table_name)
+
     def validate_query(self, sql: str):
         """
         Checks a query for safety issues WITHOUT executing it:

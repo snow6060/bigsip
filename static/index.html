@@ -6,55 +6,148 @@
     <title>bigsip</title>
     <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
-    <header>
-        <h1>bigsip</h1>
-        <p class="tagline">Query massive local files with AI — without uploading them.</p>
-    </header>
+    <div class="sky-shimmer"></div>
 
-    <main>
+    <!-- ── Screen 1: Mode choice ── -->
+    <div id="mode-choice-screen">
+        <div class="mode-choice-hero">
+            <img src="logo.png" alt="bigsip" class="mode-choice-logo">
+            <p class="tagline">Query massive local files with AI — without uploading them.</p>
+        </div>
 
-        <!-- Section 1: File loading — always visible -->
-        <section id="load-section">
-            <h2>Load Data</h2>
-            <button id="select-files-btn">Select File(s)</button>
-            <input type="file" id="file-input" multiple accept=".csv,.xlsx" style="display: none;">
-            <ul id="loaded-files-list"></ul>
-        </section>
+        <div class="mode-cards">
+            <div class="mode-card" data-mode="mcp" role="button" tabindex="0">
+                <div class="card-icon">⚡</div>
+                <h2>MCP Server</h2>
+                <p>For Claude Desktop. Set up once, then just ask — no copy-pasting.</p>
+            </div>
 
-        <!-- Section 2: Schema view — hidden until a file is loaded -->
-        <section id="schema-section" class="hidden">
-            <h2>Loaded Tables</h2>
-            <div id="schema-display"></div>
-        </section>
+            <div class="mode-card" data-mode="browser" role="button" tabindex="0">
+                <div class="card-icon">🌐</div>
+                <h2>Browser-Based Agents</h2>
+                <p>For DeepSeek, Gemini, ChatGPT, or any other browser AI chat.</p>
+            </div>
+        </div>
+    </div>
 
-        <!-- Section 3: Query tester — hidden until a file is loaded -->
-        <section id="query-section" class="hidden">
-            <h2>Run a Query</h2>
-            <textarea id="query-input" placeholder="SELECT * FROM your_table LIMIT 10"></textarea>
-            <button id="run-query-btn">Run Query</button>
-            <div id="query-results"></div>
-        </section>
+    <!-- ── Screen 2: App shell (sidebar + dashboard) ── -->
+    <div id="app-shell" class="hidden">
 
-        <!-- Section 4: Prompt generator — hidden until a file is loaded -->
-        <section id="prompt-section" class="hidden">
-            <h2>AI System Prompt</h2>
-            <textarea id="prompt-context" placeholder="Optional: add context about what you're trying to do"></textarea>
-            <button id="copy-prompt-btn">Copy Prompt</button>
-        </section>
+        <aside id="sidebar">
+            <div class="sidebar-brand">
+                <img src="logo.png" alt="bigsip" class="sidebar-logo">
+            </div>
 
-        <!-- Section 5: Status dashboard — hidden until a file is loaded -->
-        <section id="status-section" class="hidden">
-            <h2>Status</h2>
-            <div id="bridge-status"></div>
-            <div id="status-display"></div>
-        </section>
+            <nav>
+                <button id="nav-change-mode">Change Mode</button>
+                <button id="nav-guide">User Guide</button>
+                <button id="nav-reset">Reset Session</button>
+            </nav>
 
-    </main>
+            <div id="sidebar-status">
+                <h3>Status</h3>
+                <div id="status-display"></div>
+                <div id="bridge-status" class="hidden"></div>
+                <div id="mcp-status" class="hidden"></div>
+            </div>
+
+            <a href="https://github.com/snow6060/bigsip" target="_blank" id="sidebar-about">GitHub / About</a>
+        </aside>
+
+        <main id="dashboard">
+
+            <!-- MCP Server Connect (Mode 1 - Step 1) -->
+            <section id="mcp-panel" class="hidden mode-panel glass-panel">
+                <h2 id="mcp-step-title">1. Connect to Claude Desktop</h2>
+                <div id="mcp-status-badge" class="status-badge">Checking...</div>
+                <div id="mcp-setup-block">
+                    <button id="mcp-setup-auto-btn" class="btn-primary">Set Up Automatically</button>
+                    <div class="mcp-manual-row">
+                        <input type="text" id="mcp-manual-path" placeholder="Or paste path to claude_desktop_config.json">
+                        <button id="mcp-setup-manual-btn" class="btn-secondary">Set Up</button>
+                        <span class="help-icon" id="mcp-help-icon" title="Open Claude Desktop → Settings → Developer → Edit Config, then copy the file path shown there">?</span>
+                    </div>
+                </div>
+                <p id="mcp-setup-message" class="hidden"></p>
+            </section>
+
+            <!-- System Prompt (Mode 2 - Step 1) -->
+            <section id="prompt-section" class="glass-panel">
+                <h2 id="prompt-step-title">1. Copy the System Prompt</h2>
+                <p class="section-help">Paste this as your first message to the AI — it teaches it how to talk to your data.</p>
+                <textarea id="prompt-context" placeholder="Optional: add context about what you're trying to do"></textarea>
+                <div class="prompt-action-row">
+                    <button id="copy-prompt-btn" class="btn-primary">Copy Prompt</button>
+                    <span class="prompt-note">Paste this as your very first message to your AI — before asking anything else.</span>
+                </div>
+            </section>
+
+            <!-- Load Data Card (Step 2 - Both Modes) -->
+            <section id="load-section" class="glass-panel">
+                <h2>2. Load Your Data</h2>
+                <p class="section-help">Your file stays on this computer — nothing is uploaded.</p>
+                
+                <div class="load-action-row">
+                    <button id="select-files-btn" class="btn-primary">Select File(s)</button>
+                    <button id="toggle-schema-btn" class="btn-secondary hidden">Loaded Tables</button>
+                </div>
+
+                <ul id="loaded-files-list"></ul>
+
+                <!-- Inline Loaded Tables viewer -->
+                <div id="schema-section" class="hidden schema-container">
+                    <div id="schema-display"></div>
+                </div>
+            </section>
+
+            <!-- Browser Ask AI Card (Mode 2 - Step 3) -->
+            <section id="browser-panel" class="hidden mode-panel glass-panel">
+                <h2>3. Ask Your AI</h2>
+                <p class="section-help">bigsip is watching your clipboard. Ask your question in the chat as normal — the answer comes back automatically, ready to paste.</p>
+            </section>
+
+            <!-- Query Tester Card (Step 3 or 4) -->
+            <section id="query-section" class="hidden glass-panel">
+                <h2 id="query-toggle" class="clickable-header"><span id="query-step-title">3. Query Tester (advanced)</span> ▸</h2>
+                <div id="query-body" class="hidden">
+                    <textarea id="query-input" placeholder="SELECT * FROM your_table LIMIT 10"></textarea>
+                    <button id="run-query-btn" class="btn-primary">Run Query</button>
+                    <div id="query-results"></div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- ── User Guide overlay ── -->
+    <div id="guide-overlay" class="hidden">
+        <div id="guide-panel" class="glass-panel">
+            <button id="guide-close-btn">✕</button>
+
+            <h2>Getting Started</h2>
+            <ol>
+                <li><strong>Choose your mode.</strong> MCP Server (for Claude Desktop) or Browser-Based Agents (DeepSeek, Gemini, ChatGPT, or any other browser AI chat). Pick based on which AI you actually use — you can switch anytime from the sidebar.</li>
+                <li><strong>Load your file(s).</strong> Click "Select File(s)" and pick a CSV or Excel file. Nothing uploads anywhere — the file stays on your computer the whole time.</li>
+                <li><strong>Copy the system prompt.</strong> One click copies it. Paste it as your first message to the AI — this is what teaches it how to talk to your data.</li>
+                <li><strong>(Browser-Based Agents mode only)</strong> Ask your question in the chat as normal. bigsip watches your clipboard automatically — when the AI asks for your data, the answer gets copied back for you to paste. No extra steps.</li>
+                <li><strong>(MCP Server mode only)</strong> Set up the connection once (button on this screen), restart Claude Desktop, then just ask it about your data directly — no copy-pasting needed, ever again.</li>
+            </ol>
+
+            <h2>What Is What</h2>
+            <ul>
+                <li><strong>System Prompt</strong> — instructions that teach the AI how to ask bigsip for data. Always copy this first, before asking your real question.</li>
+                <li><strong>MCP Server</strong> — direct connection method for Claude Desktop. Set up once; after that, Claude Desktop talks to bigsip automatically.</li>
+                <li><strong>Clipboard Bridge</strong> — connection method for browser AI chats. It watches your clipboard and relays queries and answers.</li>
+                <li><strong>Loaded Tables</strong> — inspect columns and sample rows directly inside the Load Your Data section.</li>
+                <li><strong>Query Tester</strong> — run custom SQL queries against your data locally inside bigsip.</li>
+                <li><strong>Reset Session</strong> — clears everything and starts fresh.</li>
+                <li><strong>Status</strong> — monitors memory usage and connection health.</li>
+            </ul>
+        </div>
+    </div>
 
     <script src="app.js"></script>
-
 </body>
 </html>

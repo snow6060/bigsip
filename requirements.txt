@@ -8,3 +8,4 @@ requests==2.32.3
 pyperclip==1.9.0
 mcp>=1.2.0,<2.0.0
 platformdirs==4.3.6
+pywebview==6.2.1

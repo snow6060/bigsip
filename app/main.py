@@ -40,9 +40,8 @@ class LoadFileRequest(BaseModel):
 @app.on_event("startup")
 def load_data_on_startup():
     if len(sys.argv) < 2:
-        raise RuntimeError(
-            "Usage: python -m app.main <file1.csv|xlsx> [more files...]"
-        )
+        print("No files provided at startup — waiting for files to be loaded via /load.")
+        return
 
     file_paths = sys.argv[1:]
     for file_path in file_paths:
@@ -154,6 +153,16 @@ def load_file(request: LoadFileRequest):
         raise HTTPException(status_code=400, detail=f"Failed to load file: {str(e)}")
 
     return {"loaded_tables": new_tables}
+
+
+@app.delete("/table/{table_name}")
+def drop_table(table_name: str):
+    try:
+        engine.drop_table(table_name)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    return {"dropped": table_name, "remaining_tables": engine.table_names}
 
 
 @app.get("/status")
