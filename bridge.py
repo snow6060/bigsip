@@ -40,15 +40,17 @@ def write_heartbeat():
         f.write(str(time.time()))
 
 
-def handle_schema_request() -> str:
-    response = requests.get(f"{GATEWAY_URL}/schema")
+def handle_schema_request(gateway_url: str | None = None) -> str:
+    url = gateway_url or GATEWAY_URL
+    response = requests.get(f"{url}/schema")
     response.raise_for_status()
     return json.dumps(response.json(), indent=2)
 
 
-def handle_query_request(sql: str) -> str:
+def handle_query_request(sql: str, gateway_url: str | None = None) -> str:
+    url = gateway_url or GATEWAY_URL
     response = requests.post(
-        f"{GATEWAY_URL}/query",
+        f"{url}/query",
         json={"sql": sql},
     )
     if response.status_code != 200:
@@ -60,7 +62,7 @@ def handle_query_request(sql: str) -> str:
     return json.dumps(response.json(), indent=2)
 
 
-def process_clipboard_text(text: str) -> str | None:
+def process_clipboard_text(text: str, gateway_url: str | None = None) -> str | None:
     """
     Checks clipboard text against known markers.
     Returns the JSON result string if it matched something, else None.
@@ -69,14 +71,14 @@ def process_clipboard_text(text: str) -> str | None:
 
     if stripped.startswith(SCHEMA_MARKER):
         try:
-            return handle_schema_request()
+            return handle_schema_request(gateway_url)
         except requests.exceptions.RequestException as e:
             return json.dumps({"error": f"Could not reach gateway: {e}"}, indent=2)
 
     if stripped.startswith(QUERY_MARKER):
         sql = stripped[len(QUERY_MARKER):].strip()
         try:
-            return handle_query_request(sql)
+            return handle_query_request(sql, gateway_url)
         except requests.exceptions.RequestException as e:
             return json.dumps({"error": f"Could not reach gateway: {e}"}, indent=2)
 

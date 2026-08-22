@@ -22,12 +22,14 @@ import time
 import requests
 import uvicorn
 import webview
+import pyperclip
 from pathlib import Path
 
 from app.main import app, find_free_port
 from app.mcp_config import find_claude_config_path, get_mcp_status, write_mcp_config
 from app.paths import MCP_HEARTBEAT_FILE_PATH, PORT_FILE_PATH
 from app.mcp_files import write_mcp_files
+from bridge import process_clipboard_text, write_heartbeat, POLL_INTERVAL_SECONDS
 
 LOADING_PAGE = str(Path(__file__).resolve().parent.parent / "static" / "loading.html")
 ICON_PATH = str(Path(__file__).resolve().parent.parent / "static" / "logo.ico")
@@ -44,6 +46,12 @@ MIN_SPLASH_SECONDS = 10.5
 # this allows some slack for scheduling jitter before treating it as
 # stale rather than requiring a sub-second-perfect match.
 _MCP_HEARTBEAT_FRESHNESS_SECONDS = 3
+
+# Set once in main() once the real port is known — start_bridge() needs
+# this to build the correct gateway URL for process_clipboard_text().
+_gateway_url: str | None = None
+_bridge_stop_event = threading.Event()
+_bridge_thread: threading.Thread | None = None
 
 
 def run_server(port: int):
@@ -182,9 +190,82 @@ def restart_app():
     os.execv(python, [python, "-m", "app.desktop"])
 
 
+def select_files() -> list[str]:
+    """
+    Exposed to JS as pywebview.api.select_files(). Opens a native
+    multi-select file dialog and returns the chosen absolute paths —
+    no manual path-typing, unlike the old prompt()-based picker.
+    Returns an empty list if the user cancels.
+    """
+    file_types = ('Data Files (*.csv;*.xlsx)', 'All files (*.*)')
+    result = webview.windows[0].create_file_dialog(
+        webview.OPEN_DIALOG, allow_multiple=True, file_types=file_types
+    )
+    return list(result) if result else []
+
+
+def _bridge_loop():
+    """
+    Runs on its own daemon thread once start_bridge() is called.
+    Mirrors bridge.py's main() polling loop exactly, but checks
+    _bridge_stop_event each cycle so stop_bridge() can end it cleanly
+    (e.g. when the user switches away from Browser-Based Agents mode)
+    instead of only ever stopping when the whole process exits.
+    """
+    last_seen = pyperclip.paste()
+
+    while not _bridge_stop_event.is_set():
+        time.sleep(POLL_INTERVAL_SECONDS)
+        write_heartbeat()
+        current = pyperclip.paste()
+
+        if current == last_seen:
+            continue
+
+        last_seen = current
+        result = process_clipboard_text(current, _gateway_url)
+
+        if result is not None:
+            pyperclip.copy(result)
+            last_seen = result  # avoid re-triggering on our own output
+
+
+def start_bridge() -> dict:
+    """
+    Exposed to JS as pywebview.api.start_bridge(). Starts the
+    clipboard-watching loop as a daemon thread, using bridge.py's
+    real logic (process_clipboard_text, write_heartbeat) rather than
+    a duplicate copy. Safe to call more than once — a no-op if the
+    bridge is already running.
+    """
+    global _bridge_thread
+
+    if _bridge_thread is not None and _bridge_thread.is_alive():
+        return {"success": True}  # already running
+
+    _bridge_stop_event.clear()
+    _bridge_thread = threading.Thread(target=_bridge_loop, daemon=True)
+    _bridge_thread.start()
+    return {"success": True}
+
+
+def stop_bridge() -> dict:
+    """
+    Exposed to JS as pywebview.api.stop_bridge(). Signals the
+    clipboard-watching thread to stop after its current sleep cycle
+    (at most POLL_INTERVAL_SECONDS delay, not instant). Safe to call
+    even if the bridge isn't running.
+    """
+    _bridge_stop_event.set()
+    return {"success": True}
+
+
 def main():
+    global _gateway_url
+
     port = find_free_port()
     PORT_FILE_PATH.write_text(str(port), encoding="utf-8")
+    _gateway_url = f"http://127.0.0.1:{port}"
 
     server_thread = threading.Thread(target=run_server, args=(port,), daemon=True)
     server_thread.start()
@@ -199,7 +280,15 @@ def main():
     # Registers check_mcp_status/setup_mcp/set_mcp_files/restart_app as callable
     # from JS via pywebview.api. Must happen after create_window() (needs a window
     # to attach to) and before webview.start() (which blocks until the window closes).
-    window.expose(check_mcp_status, setup_mcp, set_mcp_files, restart_app)
+    window.expose(
+        check_mcp_status,
+        setup_mcp,
+        set_mcp_files,
+        restart_app,
+        select_files,
+        start_bridge,
+        stop_bridge,
+    )
 
     # webview.start()'s func/args run in a thread pywebview manages
     # internally, once the window exists — this call itself is what
