@@ -5,16 +5,25 @@ HTTP requests into calls on the DataEngine.
 
 import sys
 import json
+import uuid
 import concurrent.futures
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from app.engine import DataEngine
+from app.xlsx_worker import load_xlsx_to_parquet
 import time
 import os
-from app.paths import PORT_FILE_PATH, HEARTBEAT_FILE_PATH
+from app.paths import (
+    PORT_FILE_PATH,
+    HEARTBEAT_FILE_PATH,
+    LOAD_PROGRESS_PATH,
+    LOAD_TEMP_DIR,
+)
+from fastapi.encoders import jsonable_encoder
 
 app = FastAPI(title="bigsip gateway")
 engine = DataEngine()
@@ -24,6 +33,8 @@ engine = DataEngine()
 # stops us WAITING on a stuck query — it does not guarantee the query
 # itself stops running in the background.
 _query_executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+_load_process_executor = ProcessPoolExecutor(max_workers=1)
+_active_load_job: dict | None = None  # only one xlsx load in flight at a time
 _QUERY_TIMEOUT_SECONDS = 15
 _start_time = time.time()
 
@@ -113,7 +124,7 @@ def get_prompt(context: str | None = None):
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    schema_text = json.dumps(schema, indent=2)
+    schema_text = json.dumps(jsonable_encoder(schema), indent=2)
 
     parts = [static_rules.strip()]
 
@@ -128,31 +139,109 @@ def get_prompt(context: str | None = None):
 @app.post("/load")
 def load_file(request: LoadFileRequest):
     """
-    Loads a file into the already-running engine. Unlike startup-time
-    loading (via command-line args), this lets the UI load files after
-    the server is already running.
+    CSV: loaded synchronously — DuckDB's own reader is fast/C-level,
+    no reason to complicate it.
+
+    XLSX: handed off to a separate OS PROCESS (not just a thread) via
+    load_xlsx_to_parquet, since a genuinely CPU-bound Python parsing
+    loop (openpyxl/pandas across many sheets) holds the GIL heavily
+    enough that a thread pool alone wouldn't keep the rest of the app
+    responsive. Returns immediately with a "started" status — the UI
+    polls /load-status for progress and final completion.
     """
+    global _active_load_job
+
     ext = Path(request.file_path).suffix.lower()
 
-    try:
-        if ext == ".csv":
+    if ext == ".csv":
+        try:
             engine.load_csv(request.file_path, table_name=request.table_name)
-            new_tables = [engine.table_names[-1]]
-        elif ext == ".xlsx":
-            before = set(engine.table_names)
-            engine.load_xlsx(request.file_path, sheets=request.sheets)
-            new_tables = [t for t in engine.table_names if t not in before]
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported file type: '{request.file_path}'"
-            )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to load file: {str(e)}")
+            return {"status": "complete", "loaded_tables": [engine.table_names[-1]]}
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to load file: {str(e)}")
 
-    return {"loaded_tables": new_tables}
+    elif ext == ".xlsx":
+        if _active_load_job is not None and not _active_load_job["future"].done():
+            raise HTTPException(
+                status_code=409,
+                detail="A file is already loading. Please wait for it to finish.",
+            )
+
+        LOAD_TEMP_DIR.mkdir(parents=True, exist_ok=True)
+        future = _load_process_executor.submit(
+            load_xlsx_to_parquet,
+            request.file_path,
+            request.sheets,
+            str(LOAD_TEMP_DIR),
+            str(LOAD_PROGRESS_PATH),
+        )
+        _active_load_job = {"future": future, "finalized": False}
+        return {"status": "started", "job_id": str(uuid.uuid4())}
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type: '{request.file_path}'")
+
+
+@app.get("/load-status")
+def get_load_status():
+    """
+    Polled by the UI while an xlsx load is in progress. Returns live
+    progress while the subprocess is still working, and does the fast
+    Parquet -> DuckDB finalization step itself, the FIRST time it's
+    polled after the subprocess actually finishes.
+    """
+    global _active_load_job
+
+    if _active_load_job is None:
+        return {"status": "idle"}
+
+    future = _active_load_job["future"]
+
+    if not future.done():
+        # Only trust the progress file while it's genuinely reporting
+        # "in_progress" — the worker writes "complete"/"error" into this
+        # same file slightly BEFORE future.done() actually becomes True
+        # (a real gap while the result is pickled back across the process
+        # boundary), and that file's "complete" has a different shape (no
+        # loaded_tables) than this endpoint's own finalized response below.
+        # Trusting it directly during that gap was the bug. future.done()
+        # is the only real source of truth for completion — anything else
+        # just keeps the frontend politely waiting/polling.
+        try:
+            data = json.loads(LOAD_PROGRESS_PATH.read_text(encoding="utf-8"))
+            if data.get("status") == "in_progress":
+                return data
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass
+        return {"status": "in_progress", "current_sheet": 0, "total_sheets": 0, "sheet_name": ""}
+
+    if _active_load_job["finalized"]:
+        return {"status": "complete", "loaded_tables": _active_load_job.get("loaded_tables", [])}
+
+    result = future.result()
+    _active_load_job["finalized"] = True
+
+    if result["error"]:
+        _active_load_job["loaded_tables"] = []
+        return {"status": "error", "error": result["error"]}
+
+    loaded_tables = []
+    for table in result["tables"]:
+        try:
+            engine.load_parquet_table(table["parquet_path"], table["table_name"])
+            loaded_tables.append(table["table_name"])
+        except ValueError as e:
+            print(f"Skipping table '{table['table_name']}': {e}")
+        finally:
+            try:
+                os.remove(table["parquet_path"])
+            except OSError:
+                pass
+
+    _active_load_job["loaded_tables"] = loaded_tables
+    return {"status": "complete", "loaded_tables": loaded_tables}
 
 
 @app.delete("/table/{table_name}")
@@ -233,6 +322,8 @@ def find_free_port() -> int:
 
 
 if __name__ == "__main__":
+    import multiprocessing
+    multiprocessing.freeze_support()
     import uvicorn
     port = find_free_port()
 

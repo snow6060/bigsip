@@ -140,6 +140,19 @@ class DataEngine:
 
         workbook.close()
 
+    def load_parquet_table(self, parquet_path: str, table_name: str):
+        """
+        Loads a pre-parsed Parquet file (written by xlsx_worker.py in a
+        separate process) as a new table. DuckDB reads Parquet natively
+        and fast — this is the "finalization" step after the heavy xlsx
+        parsing has already happened elsewhere.
+        """
+        self._register_table_name(table_name)
+        self.con.execute(
+            f"CREATE TABLE {table_name} AS SELECT * FROM read_parquet(?)",
+            [parquet_path],
+        )
+
     def get_schema(self) -> dict:
         if not self.table_names:
             raise RuntimeError("No tables loaded yet.")
