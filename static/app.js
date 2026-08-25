@@ -5,10 +5,16 @@ let currentMode = localStorage.getItem("bigsip_mode"); // "mcp" | "browser" | nu
 // ── DOM references ──
 const modeChoiceScreen = document.getElementById("mode-choice-screen");
 const appShell = document.getElementById("app-shell");
+const dashboard = document.getElementById("dashboard");
 const browserPanel = document.getElementById("browser-panel");
 const mcpPanel = document.getElementById("mcp-panel");
+const loadSection = document.getElementById("load-section");
+const promptSection = document.getElementById("prompt-section");
 
 const selectFilesBtn = document.getElementById("select-files-btn");
+const toggleSchemaBtn = document.getElementById("toggle-schema-btn");
+const loadProgressContainer = document.getElementById("load-progress-container");
+const loadProgressBar = document.getElementById("load-progress-bar");
 const loadedFilesList = document.getElementById("loaded-files-list");
 const schemaSection = document.getElementById("schema-section");
 const schemaDisplay = document.getElementById("schema-display");
@@ -28,6 +34,23 @@ const bridgeStatusEl = document.getElementById("bridge-status");
 const mcpStatusEl = document.getElementById("mcp-status");
 
 const guideOverlay = document.getElementById("guide-overlay");
+const customAlertOverlay = document.getElementById("custom-alert-overlay");
+const customAlertMessage = document.getElementById("custom-alert-message");
+const customAlertOkBtn = document.getElementById("custom-alert-ok-btn");
+
+function showCustomAlert(message) {
+    if (customAlertOverlay && customAlertMessage) {
+        customAlertMessage.textContent = message;
+        customAlertOverlay.classList.remove("hidden");
+        customAlertOkBtn.focus();
+    } else {
+        window.alert(message);
+    }
+}
+
+customAlertOkBtn.addEventListener("click", () => {
+    customAlertOverlay.classList.add("hidden");
+});
 
 // ── Wait for pywebview's JS bridge to be ready ──
 function whenPywebviewReady(callback) {
@@ -46,7 +69,22 @@ document.querySelectorAll(".mode-card").forEach(card => {
 function setMode(mode) {
     currentMode = mode;
     localStorage.setItem("bigsip_mode", mode);
+    reorderDashboardSections(mode);
     showAppShell();
+}
+
+function reorderDashboardSections(mode) {
+    if (mode === "mcp") {
+        dashboard.appendChild(mcpPanel);
+        dashboard.appendChild(loadSection);
+        dashboard.appendChild(promptSection);
+        dashboard.appendChild(querySection);
+    } else {
+        dashboard.appendChild(loadSection);
+        dashboard.appendChild(promptSection);
+        dashboard.appendChild(browserPanel);
+        dashboard.appendChild(querySection);
+    }
 }
 
 function showAppShell() {
@@ -72,6 +110,7 @@ function showAppShell() {
 }
 
 if (currentMode) {
+    reorderDashboardSections(currentMode);
     showAppShell();
 }
 
@@ -120,20 +159,65 @@ async function loadFile(filePath) {
 
         if (!response.ok) {
             const error = await response.json();
-            alert(`Failed to load "${filePath}": ${error.detail}`);
+            showCustomAlert(`Failed to load "${filePath}": ${error.detail}`);
             return;
         }
 
         const result = await response.json();
-        loadedFiles.push({ path: filePath, tables: result.loaded_tables });
 
-        renderFilesList();
-        schemaSection.classList.remove("hidden");
-        querySection.classList.remove("hidden");
-        await refreshSchema();
+        if (result.status === "started") {
+            await pollLoadStatus(filePath);
+        } else {
+            loadedFiles.push({ path: filePath, tables: result.loaded_tables });
+            renderFilesList();
+            document.getElementById("toggle-schema-btn").classList.remove("hidden");
+            querySection.classList.remove("hidden");
+            await refreshSchema();
+        }
     } catch (err) {
-        alert(`Error loading file: ${err.message}`);
+        showCustomAlert(`Error loading file: ${err.message}`);
     }
+}
+
+async function pollLoadStatus(filePath) {
+    selectFilesBtn.disabled = true;
+    loadProgressContainer.classList.remove("hidden");
+    loadProgressBar.style.width = "0%";
+
+    while (true) {
+        const response = await fetch(`${API_BASE}/load-status`);
+        const data = await response.json();
+
+        if (data.status === "in_progress") {
+            const progress = data.total_sheets
+                ? (data.current_sheet / data.total_sheets) * 100
+                : 0;
+            loadProgressBar.style.width = `${progress}%`;
+            selectFilesBtn.textContent = data.total_sheets
+                ? `Loading, please wait... (sheet ${data.current_sheet}/${data.total_sheets}: ${data.sheet_name})`
+                : "Loading, please wait...";
+        } else if (data.status === "complete") {
+            loadProgressBar.style.width = "100%";
+            loadedFiles.push({ path: filePath, tables: data.loaded_tables });
+            renderFilesList();
+            document.getElementById("toggle-schema-btn").classList.remove("hidden");
+            querySection.classList.remove("hidden");
+            await refreshSchema();
+            break;
+        } else if (data.status === "error") {
+            showCustomAlert(`Failed to load "${filePath}": ${data.error}`);
+            break;
+        } else {
+            break;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    selectFilesBtn.disabled = false;
+    selectFilesBtn.textContent = "Select File(s)";
+    loadProgressContainer.classList.add("hidden");
+    loadProgressBar.style.width = "0%";
 }
 
 function renderFilesList() {
@@ -167,6 +251,7 @@ async function removeFile(fileEntry) {
 
     if (loadedFiles.length === 0) {
         schemaSection.classList.add("hidden");
+        document.getElementById("toggle-schema-btn").classList.add("hidden");
     }
 }
 
@@ -208,6 +293,11 @@ async function refreshSchema() {
         });
     });
 }
+
+// ── Toggle Loaded Tables ──
+document.getElementById("toggle-schema-btn").addEventListener("click", () => {
+    schemaSection.classList.toggle("hidden");
+});
 
 // ── Query tester (collapsed by default) ──
 queryToggle.addEventListener("click", () => {
@@ -267,11 +357,23 @@ copyPromptBtn.addEventListener("click", async () => {
     try {
         const response = await fetch(url);
         const text = await response.text();
+
+        if (!response.ok) {
+            let message = "Failed to generate prompt.";
+            try {
+                message = JSON.parse(text).detail || message;
+            } catch {
+                // response wasn't JSON — fall back to the generic message
+            }
+            showCustomAlert(message);
+            return;
+        }
+
         await navigator.clipboard.writeText(text);
         copyPromptBtn.textContent = "Copied!";
         setTimeout(() => { copyPromptBtn.textContent = "Copy Prompt"; }, 1500);
     } catch (err) {
-        alert(`Failed to copy prompt: ${err.message}`);
+        showCustomAlert(`Failed to copy prompt: ${err.message}`);
     }
 });
 

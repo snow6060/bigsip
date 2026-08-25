@@ -58,9 +58,9 @@
 
         <main id="dashboard">
 
-            <!-- MCP Server Connect (Mode 1 - Step 1) -->
+            <!-- Card: Connect to Claude Desktop -->
             <section id="mcp-panel" class="hidden mode-panel glass-panel">
-                <h2 id="mcp-step-title">1. Connect to Claude Desktop</h2>
+                <h2>Connect to Claude Desktop</h2>
                 <div id="mcp-status-badge" class="status-badge">Checking...</div>
                 <div id="mcp-setup-block">
                     <button id="mcp-setup-auto-btn" class="btn-primary">Set Up Automatically</button>
@@ -73,25 +73,22 @@
                 <p id="mcp-setup-message" class="hidden"></p>
             </section>
 
-            <!-- System Prompt (Mode 2 - Step 1) -->
-            <section id="prompt-section" class="glass-panel">
-                <h2 id="prompt-step-title">1. Copy the System Prompt</h2>
-                <p class="section-help">Paste this as your first message to the AI — it teaches it how to talk to your data.</p>
-                <textarea id="prompt-context" placeholder="Optional: add context about what you're trying to do"></textarea>
-                <div class="prompt-action-row">
-                    <button id="copy-prompt-btn" class="btn-primary">Copy Prompt</button>
-                    <span class="prompt-note">Paste this as your very first message to your AI — before asking anything else.</span>
-                </div>
-            </section>
-
-            <!-- Load Data Card (Step 2 - Both Modes) -->
+            <!-- Card: Load Your Data -->
             <section id="load-section" class="glass-panel">
-                <h2>2. Load Your Data</h2>
+                <div class="section-header-row">
+                    <h2>Load Your Data</h2>
+                    <span class="section-subtext">(Must load data first to copy the prompt)</span>
+                </div>
                 <p class="section-help">Your file stays on this computer — nothing is uploaded.</p>
                 
                 <div class="load-action-row">
                     <button id="select-files-btn" class="btn-primary">Select File(s)</button>
                     <button id="toggle-schema-btn" class="btn-secondary hidden">Loaded Tables</button>
+                </div>
+
+                <!-- Visual Sheet Progress Bar (Driven by polling response) -->
+                <div id="load-progress-container" class="hidden">
+                    <div id="load-progress-bar"></div>
                 </div>
 
                 <ul id="loaded-files-list"></ul>
@@ -102,15 +99,26 @@
                 </div>
             </section>
 
-            <!-- Browser Ask AI Card (Mode 2 - Step 3) -->
+            <!-- Card: Copy the System Prompt -->
+            <section id="prompt-section" class="glass-panel">
+                <h2>Copy the System Prompt</h2>
+                <p class="section-help">Paste this as your first message to the AI — it teaches it how to talk to your data.</p>
+                <textarea id="prompt-context" placeholder="Optional: add context about what you're trying to do"></textarea>
+                <div class="prompt-action-row">
+                    <button id="copy-prompt-btn" class="btn-primary">Copy Prompt</button>
+                    <span class="prompt-note">Paste this as your very first message to your AI — before asking anything else.</span>
+                </div>
+            </section>
+
+            <!-- Card: Ask Your AI (Browser Mode) -->
             <section id="browser-panel" class="hidden mode-panel glass-panel">
-                <h2>3. Ask Your AI</h2>
+                <h2>Ask Your AI</h2>
                 <p class="section-help">bigsip is watching your clipboard. Ask your question in the chat as normal — the answer comes back automatically, ready to paste.</p>
             </section>
 
-            <!-- Query Tester Card (Step 3 or 4) -->
+            <!-- Card: Query Tester (advanced) -->
             <section id="query-section" class="hidden glass-panel">
-                <h2 id="query-toggle" class="clickable-header"><span id="query-step-title">3. Query Tester (advanced)</span> ▸</h2>
+                <h2 id="query-toggle" class="clickable-header">Query Tester (advanced) ▸</h2>
                 <div id="query-body" class="hidden">
                     <textarea id="query-input" placeholder="SELECT * FROM your_table LIMIT 10"></textarea>
                     <button id="run-query-btn" class="btn-primary">Run Query</button>
@@ -119,6 +127,14 @@
             </section>
 
         </main>
+    </div>
+
+    <!-- ── Custom Glass Alert Modal (Replaces default browser alert) ── -->
+    <div id="custom-alert-overlay" class="hidden">
+        <div class="custom-alert-card glass-panel">
+            <p id="custom-alert-message">No tables loaded yet.</p>
+            <button id="custom-alert-ok-btn" class="btn-primary">OK</button>
+        </div>
     </div>
 
     <!-- ── User Guide overlay ── -->
