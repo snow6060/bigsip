@@ -15,6 +15,7 @@ from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from app.engine import DataEngine
 from app.xlsx_worker import load_xlsx_to_parquet
+from app.paths import resource_path
 import time
 import os
 from app.paths import (
@@ -106,7 +107,7 @@ def run_query(request: QueryRequest):
         raise HTTPException(status_code=400, detail=f"Query failed: {str(e)}")
 
 
-STATIC_PROMPT_PATH = Path(__file__).parent.parent / "docs" / "system-prompt.md"
+STATIC_PROMPT_PATH = resource_path("docs", "system-prompt.md")
 
 
 @app.get("/prompt", response_class=PlainTextResponse)
@@ -306,7 +307,7 @@ def get_bridge_status():
     return {"bridge_running": bridge_running}
 
 
-app.mount("/ui", StaticFiles(directory="static", html=True), name="static")
+app.mount("/ui", StaticFiles(directory=str(resource_path("static")), html=True), name="static")
 
 def find_free_port() -> int:
     """
