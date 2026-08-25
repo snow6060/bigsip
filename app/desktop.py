@@ -27,12 +27,13 @@ from pathlib import Path
 
 from app.main import app, find_free_port
 from app.mcp_config import find_claude_config_path, get_mcp_status, write_mcp_config
-from app.paths import MCP_HEARTBEAT_FILE_PATH, PORT_FILE_PATH
+from app.paths import MCP_HEARTBEAT_FILE_PATH, PORT_FILE_PATH, resource_path
 from app.mcp_files import write_mcp_files
 from bridge import process_clipboard_text, write_heartbeat, POLL_INTERVAL_SECONDS
 
-LOADING_PAGE = str(Path(__file__).resolve().parent.parent / "static" / "loading.html")
-ICON_PATH = str(Path(__file__).resolve().parent.parent / "static" / "logo.ico")
+
+LOADING_PAGE = str(resource_path("static", "loading.html"))
+ICON_PATH = str(resource_path("static", "logo.ico"))
 
 # The splash is a deliberate, polished beat — not just a stopgap for
 # server startup. It's shown for at least this long regardless of how
