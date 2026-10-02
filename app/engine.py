@@ -93,7 +93,7 @@ class DataEngine:
         self._register_table_name(table_name)
 
         self.con.execute(
-            f"CREATE TABLE {table_name} AS SELECT * FROM read_csv_auto(?)",
+            f"CREATE TABLE {table_name} AS SELECT * FROM read_csv_auto(?, null_padding=true)",
             [file_path],
         )
 
